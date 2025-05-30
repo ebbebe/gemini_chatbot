@@ -47,17 +47,59 @@ def show_chat_tab():
                         question = st.session_state['chat_messages'][msg_idx-1]['content']
                         answer = msg['content']
                         
-                        if st.button("📅 이 계획을 로드맵에 추가", key=f"add_roadmap_{msg_idx}"):
-                            if 'roadmap_items' not in st.session_state:
-                                st.session_state['roadmap_items'] = []
+                        if st.button("📅 이 고민을 7일 계획으로 생성", key=f"add_roadmap_{msg_idx}"):
+                            from utils.saju import generate_weekly_plan
                             
-                            st.session_state['roadmap_items'].append({
-                                'question': question,
-                                'answer': answer,
-                                'date_added': datetime.datetime.now().strftime("%Y-%m-%d")
-                            })
+                            # 7일 계획 생성
+                            with st.spinner("맞춤형 7일 계획을 생성하고 있습니다..."):
+                                # AI를 통해 7일 계획 생성
+                                weekly_plan = generate_weekly_plan(st.session_state['user_info'], question)
+                                
+                                # 새 계획으로 설정
+                                st.session_state['weekly_plan'] = weekly_plan
+                                st.session_state['current_concern'] = question
+                                
+                                # 태스크도 추가
+                                current_date = datetime.datetime.now().date()
+                                for i, plan in enumerate(weekly_plan):
+                                    task_date = current_date + datetime.timedelta(days=i)
+                                    task_id = f"{task_date.strftime('%Y-%m-%d')}_plan_{i}"
+                                    
+                                    # 태스크 추가 (from utils.calendar import add_task_to_date)
+                                    from utils.calendar import add_task_to_date
+                                    add_task_to_date(task_date.strftime('%Y-%m-%d'), {
+                                        'id': task_id,
+                                        'title': plan['title'],
+                                        'description': plan['description'],
+                                        'completed': False,
+                                        'created_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                    })
+                                
+                                # 이전 고민 기록에도 추가
+                                if 'previous_concerns' not in st.session_state:
+                                    st.session_state['previous_concerns'] = []
+                                
+                                st.session_state['previous_concerns'].append({
+                                    'concern': question,
+                                    'created_at': datetime.datetime.now().strftime('%Y-%m-%d')
+                                })
+                            
                             msg['add_to_roadmap'] = True
-                            st.success("✓ 로드맵에 추가되었습니다!")
+                            st.success("✓ 7일 계획으로 생성되었습니다! 로드맵 탭에서 확인해보세요.")
+                            
+                            # 로드맵 탭으로 자동 이동 옵션 제공
+                            if st.button("로드맵 탭으로 이동", key=f"goto_roadmap_{msg_idx}"):
+                                # 탭 인덱스 설정
+                                st.session_state['active_tab'] = 1
+                                
+                                # JavaScript를 사용한 탭 전환
+                                js = """
+                                <script>
+                                    window.parent.document.querySelectorAll('.stTabs button[role="tab"]')[1].click();
+                                </script>
+                                """
+                                st.components.v1.html(js, height=0, width=0)
+                                st.rerun()
     
     # 빠른 질문 칩 버튼들
     st.markdown('<div class="quick-chips">', unsafe_allow_html=True)

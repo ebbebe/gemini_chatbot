@@ -16,7 +16,7 @@ from components.roadmap import show_roadmap_tab
 
 # Page configuration
 st.set_page_config(
-    page_title="사주기반 코칭",
+    page_title="사주기반 멘토",
     page_icon="✨",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -55,16 +55,29 @@ def show_main_screen():
         st.markdown("### 📊 사주 분석 결과")
         st.markdown(st.session_state['user_info'].get('saju_analysis', '분석 결과가 없습니다.'))
     
-    # 탭 구성
-    tab1, tab2 = st.tabs(["🔮 고민 상담실", "🗺️ 나의 로드맵"])
+    # 세션 상태에 탭 인덱스가 없으면 초기화
+    if 'active_tab' not in st.session_state:
+        st.session_state['active_tab'] = 0
+    
+    # 탭 구성 - 활성화된 탭 번호 지정
+    tabs = st.tabs(["🔮 고민 상담실", "🗺️ 나의 7일 계획"])
     
     # 채팅 탭
-    with tab1:
+    with tabs[0]:
         show_chat_tab()
     
     # 로드맵 탭
-    with tab2:
+    with tabs[1]:
         show_roadmap_tab()
+        
+    # 자동 탭 선택 (JavaScript 사용)
+    if st.session_state['active_tab'] > 0:
+        js = f"""
+        <script>
+            window.parent.document.querySelectorAll('.stTabs button[role="tab"]')[{st.session_state['active_tab']}].click();
+        </script>
+        """
+        st.components.v1.html(js, height=0, width=0)
     
     st.markdown('</div>', unsafe_allow_html=True)
 

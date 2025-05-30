@@ -12,7 +12,7 @@ from utils.saju import analyze_saju, generate_saju_insight
 def show_onboarding():
     """온보딩 화면을 표시합니다."""
     st.markdown('<div class="main-content">', unsafe_allow_html=True)
-    st.markdown("# ✨ 사주기반 코칭")
+    st.markdown("# ✨ 사주기반 멘토")
     st.markdown("### AI가 당신의 사주를 읽고, 맞춤형 성장법을 제시합니다")
     
     with st.form("onboarding_form"):
@@ -63,7 +63,7 @@ def show_onboarding():
     
     # 서비스 설명 섹션
     st.markdown("---")
-    st.markdown("### 사주기반 코칭이 당신에게 제공하는 가치")
+    st.markdown("### 사주기반 멘토가 당신에게 제공하는 가치")
     
     col1, col2, col3 = st.columns(3)
     
@@ -86,8 +86,8 @@ def show_onboarding():
     with col3:
         st.markdown("""
         <div class="feature-card">
-            <h3>✨ 사주 기반 코칭</h3>
-            <p>동양 철학의 지혜와 현대 코칭을 결합한 새로운 접근법을 경험하세요.</p>
+            <h3>✨ 사주 기반 멘토</h3>
+            <p>동양 철학의 지혜와 현대 멘토를 결합한 새로운 접근법을 경험하세요.</p>
         </div>
         """, unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
