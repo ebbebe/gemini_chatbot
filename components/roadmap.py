@@ -163,9 +163,3 @@ def show_roadmap_tab():
             roadmap = generate_saju_insight(st.session_state['user_info'])
             st.session_state['roadmap'] = roadmap
             st.markdown(roadmap)
-    
-    if st.button("새로운 인사이트 생성하기", key="regenerate_insight"):
-        with st.spinner("인사이트 재생성 중..."):
-            roadmap = generate_saju_insight(st.session_state['user_info'])
-            st.session_state['roadmap'] = roadmap
-            st.rerun()
