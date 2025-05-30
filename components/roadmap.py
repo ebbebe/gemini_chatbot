@@ -66,14 +66,6 @@ def show_roadmap_tab():
                         <h4 style='margin-top: 0;'>계획 가이드</h4>
                         <p>{st.session_state['plan_additional_explanation']}</p>
                         </div>""", unsafe_allow_html=True)
-        
-        # 디버깅 옵션
-        with st.expander("디버깅 정보 (AI 응답 & 파싱 결과)"):
-            st.subheader("1. AI 원본 응답:")
-            st.code(st.session_state.get('debug_raw_response', '응답이 없습니다.'))
-            
-            st.subheader("2. 파싱된 계획 (데이터 형태):")
-            st.json(st.session_state['weekly_plan'])
 
         # 통계 카드
         col1, col2, col3 = st.columns(3)
@@ -109,12 +101,6 @@ def show_roadmap_tab():
         
         # 7일 계획 표시
         st.markdown("### 일주일 실천 계획")
-        
-        # 다시 생성 버튼
-        if st.button("다른 계획 생성하기"):
-            st.session_state['weekly_plan'] = []
-            st.session_state['current_concern'] = ""
-            st.rerun()
         
         # 각 날짜별 활동 표시
         today = datetime.datetime.now().date()
