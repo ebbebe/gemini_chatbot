@@ -34,32 +34,39 @@ def show_chat_tab():
     
     # 메시지 표시 - Streamlit 내장 컴포넌트 사용
     with chat_container:
-        for msg in st.session_state['chat_messages']:
+        # 마지막 AI 메시지를 찾기 위한 변수
+        last_ai_msg_idx = -1
+        for idx, msg in enumerate(st.session_state['chat_messages']):
+            if msg['role'] == 'assistant':
+                last_ai_msg_idx = idx
+        
+        # 메시지 표시
+        for idx, msg in enumerate(st.session_state['chat_messages']):
             role = msg['role']
             # st.chat_message 컴포넌트는 'ai' 대신 'assistant' 사용
             with st.chat_message(role if role != 'ai' else 'assistant'):
                 st.write(msg['content'])
                 
-                # AI/assistant 메시지 아래에만 로드맵 추가 버튼 표시
-                if role in ['ai', 'assistant'] and ('add_to_roadmap' not in msg or not msg['add_to_roadmap']):
-                    msg_idx = st.session_state['chat_messages'].index(msg)
-                    if msg_idx > 0 and st.session_state['chat_messages'][msg_idx-1]['role'] == 'user':
-                        question = st.session_state['chat_messages'][msg_idx-1]['content']
-                        answer = msg['content']
-                        
-                        if st.button("📅 이 고민을 7일 계획으로 생성", key=f"add_roadmap_{msg_idx}"):
-                            from utils.saju import generate_weekly_plan
+                # 마지막 AI 메시지에만 7일 계획 생성 버튼 표시
+                if role == 'assistant' and idx == last_ai_msg_idx and idx > 0:
+                    # 이전 메시지가 사용자 메시지인지 확인
+                    if st.session_state['chat_messages'][idx-1]['role'] == 'user':
+                        if st.button("📅 고민을 요약해서 7일 계획으로 생성", key=f"add_roadmap_{idx}"):
+                            from utils.saju import generate_weekly_plan, summarize_conversation
                             
-                            # 7일 계획 생성
-                            with st.spinner("맞춤형 7일 계획을 생성하고 있습니다..."):
-                                # AI를 통해 7일 계획 생성
-                                weekly_plan = generate_weekly_plan(st.session_state['user_info'], question)
+                            with st.spinner("대화 내용을 분석하고 7일 계획을 생성하고 있습니다..."):
+                                # 전체 대화 내용을 분석하여 핵심 고민 추출
+                                extracted_concern = summarize_conversation(st.session_state['chat_messages'])
+                                st.info(f"{extracted_concern}")
+                                
+                                # 추출된 핵심 고민을 기반으로 7일 계획 생성
+                                weekly_plan = generate_weekly_plan(st.session_state['user_info'], extracted_concern)
                                 
                                 # 새 계획으로 설정
                                 st.session_state['weekly_plan'] = weekly_plan
-                                st.session_state['current_concern'] = question
+                                st.session_state['current_concern'] = extracted_concern
                                 
-                                # 태스크도 추가
+                                # 태스크 추가
                                 current_date = datetime.datetime.now().date()
                                 for i, plan in enumerate(weekly_plan):
                                     task_date = current_date + datetime.timedelta(days=i)
@@ -75,14 +82,22 @@ def show_chat_tab():
                                         'created_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                                     })
                                 
-                                # 이전 고민 기록에도 추가
+                                # 이전 고민 기록에도 추가 (필요한 경우)
                                 if 'previous_concerns' not in st.session_state:
                                     st.session_state['previous_concerns'] = []
                                 
-                                st.session_state['previous_concerns'].append({
-                                    'concern': question,
-                                    'created_at': datetime.datetime.now().strftime('%Y-%m-%d')
-                                })
+                                # 이미 있는 고민인지 확인
+                                existing = False
+                                for concern in st.session_state['previous_concerns']:
+                                    if concern['concern'] == extracted_concern:
+                                        existing = True
+                                        break
+                                        
+                                if not existing:
+                                    st.session_state['previous_concerns'].append({
+                                        'concern': extracted_concern,
+                                        'created_at': datetime.datetime.now().strftime('%Y-%m-%d')
+                                    })
                             
                             msg['add_to_roadmap'] = True
                             st.success("✓ 7일 계획이 생성되었습니다! '나의 7일 계획' 탭에서 확인해보세요.")

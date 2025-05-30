@@ -67,6 +67,9 @@ def generate_saju_insight(user_info: Dict[str, Any], question: Optional[str] = N
     
     if question:
         prompt = f"""
+        당신은 사주 전문 상담사입니다. 
+        대화형 상담을 진행하며, 한 번에 너무 많이 말하지 않습니다.
+        
         상담자 정보:
         - 이름: {user_info['name']}
         - 생년월일: {user_info['birthdate'].strftime('%Y년 %m월 %d일')}
@@ -74,32 +77,25 @@ def generate_saju_insight(user_info: Dict[str, Any], question: Optional[str] = N
         
         상담 내용: {question}
         
-        # 답변 가이드라인
+        # 중요한 규칙
+        1. 2-3문장으로 짧게 답변
+        2. 질문을 통해 상담자가 스스로 깨달을 수 있도록 유도
+        3. 사주 특성은 자연스럽게 녹여서 표현
+        4. 조언보다는 공감과 탐색이 우선
 
-        1. **공감과 이해** (1-2문장)
-        - 상담자의 사주 특성상 왜 이런 고민이 생겼는지 설명
-        - "당신의 {{특성}}으로 인해 {{상황}}에서 어려움을 느끼시는 것이 당연합니다"
+        # 답변 구조
+        1. 공감 (1문장)
+        2. 사주 특성 언급 + 탐색 질문 (1-2문장)
 
-        2. **핵심 분석** (2-3문장)
-        - 문제의 근본 원인을 사주 관점에서 분석
-        - 상담자만의 독특한 패턴이나 성향 지적
+        # 예시
+        "적성 찾기가 정말 어렵죠. 
+        당신의 사주를 보니 [특성]이 강해서, 여러 분야에 관심이 많으실 것 같은데, 
+        최근에 가장 흥미롭게 느꼈던 일이 뭐였나요?"
 
-        3. **맞춤형 해결책** (3-4문장)
-        - "일반적으로는 ~하라고 하지만, 당신에게는 ~가 더 맞습니다"
-        - 사주 특성에 맞는 구체적인 방법 제시
-
-        4. **실천 방안** (필요시)
-        - 당장 오늘 할 수 있는 작은 행동 1가지
-        - 이번 주 시도해볼 만한 것 1가지
-
-        5. **마무리 격려** (1문장)
-        - 상담자의 강점을 활용한 긍정적 전망
-
-        # 톤 & 매너
-        - 따뜻하고 친근한 말투
-        - 전문적이지만 딱딱하지 않게
-        - 희망적이고 실용적인 조언
-        - 반말 사용 (편안한 느낌)
+        # 피해야 할 것
+        - 긴 설명
+        - 일방적인 조언
+        - 섣부른 해결책 제시
         """
     else:
         prompt = f"""
@@ -126,6 +122,57 @@ def generate_saju_insight(user_info: Dict[str, Any], question: Optional[str] = N
     except Exception as e:
         return f"생성 중 오류가 발생했습니다: {str(e)}"
 
+
+def summarize_conversation(messages: List[Dict[str, str]]) -> str:
+    """
+    대화 내용을 분석하여 핵심 고민을 추출합니다.
+    
+    Args:
+        messages: 사용자와 AI 간의 대화 메시지 목록
+        
+    Returns:
+        str: 추출된 핵심 고민
+    """
+    try:
+        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        return f"대화 요약 중 오류: {e}"
+    
+    # 대화 내용 정리 (사용자 메시지와 AI 응답 번갈아가며)
+    conversation_text = ""
+    for i, msg in enumerate(messages):
+        role = "사용자" if msg['role'] == 'user' else "AI"
+        content = msg['content'][:200] + "..." if len(msg['content']) > 200 else msg['content']
+        conversation_text += f"{role}: {content}\n\n"
+    
+    prompt = f"""
+    다음은 사용자와 AI 간의 대화입니다:
+    
+    {conversation_text}
+    
+    위 대화를 분석하여 사용자의 핵심 고민을 한 문장으로 요약해주세요.
+    사용자가 여러 주제를 언급했다면, 가장 중요하거나 반복적으로 언급된 고민을 파악해주세요.
+    요약은 '어떻게 [문제/고민]을 해결할 수 있을까요?'와 같은 질문 형식으로 작성해주세요.
+    
+    핵심 고민: 
+    """
+    
+    try:
+        response = gemini_model.generate_content(prompt)
+        extracted_concern = response.text.strip()
+        # 너무 짧은 경우 원본 마지막 질문 사용
+        if len(extracted_concern) < 10 and len(messages) > 0:
+            last_user_msg = next((msg['content'] for msg in reversed(messages) if msg['role'] == 'user'), None)
+            if last_user_msg:
+                return last_user_msg
+        return extracted_concern
+    except Exception as e:
+        if len(messages) > 0:
+            # 오류 발생 시 마지막 사용자 메시지 사용
+            last_user_msg = next((msg['content'] for msg in reversed(messages) if msg['role'] == 'user'), None)
+            if last_user_msg:
+                return last_user_msg
+        return f"대화를 요약할 수 없습니다: {e}"
 
 def generate_weekly_plan(user_info: Dict[str, Any], concern: str) -> List[Dict[str, str]]:
     """
