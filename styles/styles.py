@@ -309,9 +309,17 @@ def load_styles():
         }
         
         .calendar-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 100%;
+        }
+        
+        .calendar-week {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: 5px;
+            width: 100%;
         }
         
         .calendar-day-header {
@@ -352,6 +360,11 @@ def load_styles():
             height: 6px;
             border-radius: 50%;
             background-color: #6c5ce7;
+        }
+        
+        .calendar-day.empty {
+            background-color: #f8f9fa;
+            cursor: default;
         }
         
         .calendar-day.other-month {

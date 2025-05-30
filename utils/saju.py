@@ -8,7 +8,10 @@ Export 형태:
 - 또는 import utils.saju as saju 후 saju.analyze_saju() 형태로 사용
 """
 import datetime
-from typing import Optional, Dict, Any
+import random
+import re
+from typing import Dict, Any, Optional, List
+
 import google.generativeai as genai
 import streamlit as st
 
@@ -106,6 +109,123 @@ def generate_saju_insight(user_info: Dict[str, Any], question: Optional[str] = N
         return response.text
     except Exception as e:
         return f"생성 중 오류가 발생했습니다: {str(e)}"
+
+
+def generate_weekly_plan(user_info: Dict[str, Any], concern: str) -> List[Dict[str, str]]:
+    """
+    사용자의 고민을 7일간의 실천 계획으로 변환합니다.
+    
+    Args:
+        user_info: 사용자 정보 딕셔너리 (이름, 생년월일, 태어난 시간 포함)
+        concern: 사용자의 고민/질문
+        
+    Returns:
+        List[Dict[str, str]]: 7일간의 실천 계획 목록
+    """
+    try:
+        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+    except Exception as e:
+        return [{'day': f'Day {i+1}', 'title': '계획을 생성할 수 없습니다', 'description': f"API 설정이 필요합니다: {e}"} for i in range(7)]
+    
+    saju_elements = get_saju_elements(user_info['birthdate'], user_info['birth_hour'])
+    
+    prompt = f"""
+    사용자 정보:
+    - 이름: {user_info['name']}
+    - 생년월일: {user_info['birthdate'].strftime('%Y년 %m월 %d일')}
+    - 태어난 시간: {user_info['birth_hour']}
+    
+    사주 정보:
+    - 천간: {saju_elements['천간']}
+    - 지지: {saju_elements['지지']}
+    - 월지: {saju_elements['월지']}
+    - 일간: {saju_elements['일간']}
+    - 시지: {saju_elements['시지']}
+    
+    사용자 고민: {concern}
+    
+    위 정보를 바탕으로 사용자의 고민을 해결하기 위한 7일간의 실천 계획을 만들어주세요.
+    사주를 고려하여 사용자의 특성과 성향에 맞는 단계적 접근법을 제시해주세요.
+    
+    반드시 다음 형식으로 응답해주세요:
+    Day 1: [제목] - [설명] (30자 내외)
+    Day 2: [제목] - [설명] (30자 내외)
+    Day 3: [제목] - [설명] (30자 내외)
+    Day 4: [제목] - [설명] (30자 내외)
+    Day 5: [제목] - [설명] (30자 내외)
+    Day 6: [제목] - [설명] (30자 내외)
+    Day 7: [제목] - [설명] (30자 내외)
+    
+    각 날짜별 계획은 구체적이고 실천 가능해야 합니다. 하루에 한 가지 작은 실천에 집중하도록 해주세요.
+    전체 계획은 점진적으로 발전하여 7일 후에는 고민을 해결하거나 상당한 진전을 이룰 수 있도록 구성해주세요.
+    """
+    
+    try:
+        response = gemini_model.generate_content(prompt)
+        plan_text = response.text
+        
+        # Day 1: [제목] - [설명] 형식의 텍스트를 파싱
+        plans = []
+        lines = plan_text.strip().split('\n')
+        for i in range(min(7, len(lines))):
+            line = lines[i].strip()
+            if not line:  # 공백 줄 건너뛰기
+                continue
+                
+            try:
+                # 다양한 형식 처리
+                # 1. "Day 1: 제목 - 설명" 형식
+                day_match = re.match(r'Day \d+:\s*(.*?)\s*-\s*(.*)', line)
+                if day_match:
+                    title, description = day_match.groups()
+                    plans.append({
+                        'day': f'Day {i+1}',
+                        'title': title.strip() or f'일일 계획 {i+1}',
+                        'description': description.strip() or f'{i+1}일차 활동 내용을 제시해드립니다.'
+                    })
+                    continue
+                
+                # 2. "Day 1: 제목" 형식 (설명 없음)
+                day_title_match = re.match(r'Day \d+:\s*(.*)', line)
+                if day_title_match:
+                    title = day_title_match.group(1).strip()
+                    # 다음 줄 확인해서 설명으로 처리
+                    description = ""
+                    if i + 1 < len(lines) and not re.match(r'Day \d+:', lines[i+1]):
+                        description = lines[i+1].strip()
+                    
+                    plans.append({
+                        'day': f'Day {i+1}',
+                        'title': title or f'일일 계획 {i+1}',
+                        'description': description or f'{i+1}일차 활동을 진행하세요.'
+                    })
+                    continue
+                
+                # 3. 다른 형식의 경우 - 전체 내용을 설명으로 처리
+                plans.append({
+                    'day': f'Day {i+1}',
+                    'title': f'일일 활동 {i+1}',
+                    'description': line
+                })
+            except Exception as e:
+                plans.append({
+                    'day': f'Day {i+1}',
+                    'title': f'일일 계획 {i+1}',
+                    'description': f'{i+1}일차 실천 계획입니다.'
+                })
+        
+        # 7일이 채워지지 않았을 경우 나머지 채우기
+        while len(plans) < 7:
+            i = len(plans)
+            plans.append({
+                'day': f'Day {i+1}',
+                'title': f'추가 활동 {i+1}',
+                'description': '추가 실천 계획을 세워보세요.'
+            })
+            
+        return plans
+    except Exception as e:
+        return [{'day': f'Day {i+1}', 'title': '계획을 생성할 수 없습니다', 'description': f"오류: {str(e)}"} for i in range(7)]
 
 def analyze_saju(name: str, birthdate: datetime.date, birth_hour: str) -> Dict[str, str]:
     """

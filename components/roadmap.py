@@ -1,268 +1,252 @@
 """
-로드맵 및 캘린더 인터페이스 컴포넌트
+주간 계획 및 로드맵 인터페이스 컴포넌트
+
+사용자의 고민을 7일간의 실천 계획으로 변환하여 표시합니다.
 
 Export 형태:
 - from components.roadmap import show_roadmap_tab
 - 또는 import components.roadmap as roadmap 후 roadmap.show_roadmap_tab() 형태로 사용
 """
 import datetime
+import re
 import streamlit as st
-from utils.saju import generate_saju_insight
+from utils.saju import generate_saju_insight, generate_weekly_plan
 from utils.calendar import (
-    get_month_calendar, get_prev_month, get_next_month, 
     get_date_tasks, add_task_to_date, toggle_task_completion,
     get_tasks_stats, format_date, parse_date
 )
 
 def show_roadmap_tab():
-    """로드맵 탭 UI를 표시합니다."""
-    # 쿼리 파라미터에서 선택된 날짜 확인
-    if 'selected_date' in st.query_params:
-        selected_date = st.query_params['selected_date']
-        st.session_state['selected_date'] = selected_date
-        # 쿼리 파라미터 제거 (URL 깔끔하게 유지)
-        st.query_params.clear()
+    """주간 계획 및 로드맵 탭 UI를 표시합니다."""
+    st.markdown("### 🗺️ 7일 실천 계획")
+    st.markdown("당신의 사주를 기반으로 7일간의 맞춤형 실천 계획을 제안합니다.")
+    
+    # 고민 입력 및 계획 생성
+    if 'weekly_plan' not in st.session_state:
+        st.session_state['weekly_plan'] = []
         
-    st.markdown("### 🗺️ 나의 맞춤형 성장 로드맵")
-    st.markdown("당신의 사주를 기반으로 개인 맞춤형 성장 계획을 제안합니다.")
-    
-    # 통계 대시보드
-    stats = get_tasks_stats()
-    st.markdown("<div class='stats-container'>", unsafe_allow_html=True)
-    
-    # 진행 중인 로드맵 통계
-    st.markdown(f"""
-    <div class='stat-card'>
-        <div class='stat-value'>{stats['ongoing_roadmaps']}</div>
-        <div class='stat-label'>진행 중인 로드맵</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 완료한 태스크 통계
-    st.markdown(f"""
-    <div class='stat-card'>
-        <div class='stat-value'>{stats['completed_tasks']}</div>
-        <div class='stat-label'>완료한 태스크</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # 연속 실천일수 통계
-    st.markdown(f"""
-    <div class='stat-card'>
-        <div class='stat-value'>{stats['streak_days']}</div>
-        <div class='stat-label'>연속 실천일수</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # 캘린더 컨테이너
-    st.markdown("<div class='calendar-container'>", unsafe_allow_html=True)
-    
-    # 캘린더 헤더 - 월 네비게이션
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col1:
-        if st.button("◀ 이전", key="prev_month"):
-            st.session_state['current_date'] = get_prev_month(st.session_state['current_date'])
-            st.rerun()
-            
-    with col2:
-        current_month = st.session_state['current_date'].strftime("%Y년 %m월")
-        st.markdown(f"<h3 style='text-align: center;'>{current_month}</h3>", unsafe_allow_html=True)
+    if 'current_concern' not in st.session_state:
+        st.session_state['current_concern'] = ""
         
-    with col3:
-        if st.button("다음 ▶", key="next_month"):
-            st.session_state['current_date'] = get_next_month(st.session_state['current_date'])
-            st.rerun()
+    # 현재 주간 계획이 없으면 입력 폼 표시
+    if not st.session_state['weekly_plan']:
+        st.markdown("#### 😌 지금 가장 해결하고 싶은 고민이 무엇인가요?")
     
-    # 요일 헤더
-    weekdays = ["일", "월", "화", "수", "목", "금", "토"]
-    cols = st.columns(7)
-    for i, col in enumerate(cols):
-        with col:
-            day_style = "color: #ff5a5a;" if i == 0 else "color: #5a5aff;" if i == 6 else ""
-            st.markdown(f"<div class='calendar-day-header' style='{day_style}'>{weekdays[i]}</div>", unsafe_allow_html=True)
-    
-    # 캘린더 그리드 생성
-    current_year = st.session_state['current_date'].year
-    current_month = st.session_state['current_date'].month
-    today = datetime.datetime.now().date()
-    
-    # 이번 달의 캘린더 생성
-    calendar_grid = get_month_calendar(current_year, current_month)
-    
-    # 태스크가 있는 날짜 확인
-    days_with_tasks = set()
-    for date_str in st.session_state.get('tasks', {}).keys():
-        if date_str.startswith(f"{current_year}-{current_month:02d}"):
-            days_with_tasks.add(int(date_str.split('-')[2]))
-    
-    # 달력 표시
-    st.markdown("<div class='calendar-grid'>", unsafe_allow_html=True)
-    
-    # 선택된 날짜를 추적하는 세션 상태 변수
-    if 'selected_date' not in st.session_state:
-        st.session_state['selected_date'] = format_date(datetime.datetime.now())
-    
-    for week in calendar_grid:
-        for day in week:
-            if day == 0:
-                # 비어있는 셀
-                st.markdown("<div class='calendar-day other-month'></div>", unsafe_allow_html=True)
-            else:
-                # 날짜 형식화
-                date_obj = datetime.date(current_year, current_month, day)
-                date_str = format_date(datetime.datetime(current_year, current_month, day))
-                
-                # CSS 클래스 결정
-                day_classes = ['calendar-day']
-                if date_obj == today:
-                    day_classes.append('today')
-                if day in days_with_tasks:
-                    day_classes.append('has-tasks')
-                
-                # 클릭 가능한 날짜 셀 생성
-                day_id = f"day_{date_str}"
-                st.markdown(f"""
-                <div id='{day_id}' class='{' '.join(day_classes)}' 
-                    onclick="window.location.href='?selected_date={date_str}'">{day}</div>
-                """, unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)  # calendar-container 닫기
-    
-    # 선택된 날짜의 태스크 표시
-    selected_date = st.session_state['selected_date']
-    selected_date_obj = parse_date(selected_date)
-    st.markdown(f"#### {selected_date_obj.strftime('%Y년 %m월 %d일')} 일정")
-    
-    # 해당 날짜의 태스크 가져오기
-    tasks = get_date_tasks(selected_date)
-    
-    # 새 태스크 추가 폼
-    with st.form(key=f"add_task_form_{selected_date}"):
-        st.markdown(f"**새 태스크 추가**")
-        new_task_title = st.text_input("태스크 제목", key=f"new_task_title_{selected_date}")
-        new_task_desc = st.text_area("상세 내용", key=f"new_task_desc_{selected_date}", height=80)
-        
-        cols = st.columns([3, 1])
-        with cols[1]:
-            submit_task = st.form_submit_button("추가하기")
+    # 고민 입력 폼 추가
+    if not st.session_state['weekly_plan']:
+        with st.form(key="concern_form"):
+            concern = st.text_area("고민을 입력해주세요", 
+                                 value=st.session_state['current_concern'],
+                                 height=100,
+                                 placeholder="예: 직장에서 엄청한 스트레스를 받고 있어요. 어떻게 해결해야 할까요?")
             
-    if submit_task and new_task_title.strip():
-        # 새 태스크 추가
-        new_task = {
-            'title': new_task_title,
-            'description': new_task_desc,
-            'added_date': format_date(datetime.datetime.now())
-        }
-        add_task_to_date(selected_date, new_task)
-        st.success(f"태스크 '{new_task_title}'가 추가되었습니다.")
-        st.rerun()
-    
-    # 태스크 목록 표시
-    if not tasks:
-        st.info(f"{selected_date_obj.strftime('%m월 %d일')}에는 예정된 태스크가 없습니다.")
-    else:
-        for task in tasks:
-            task_id = task['id']
-            is_completed = st.session_state.get('task_completion', {}).get(task_id, False)
+            st.markdown("※ 고민을 입력하면 사주를 기반으로 7일간의 실천 계획을 제안해드립니다.")
+            submit_button = st.form_submit_button("계획 생성하기")
             
-            task_card = f"""
-            <div class='roadmap-card'>
-                <div class='roadmap-title'>{task['title']}</div>
-                <p>{task['description']}</p>
-                <div class='roadmap-meta'>
-                    <span>추가일: {task['added_date']}</span>
-                </div>
-            </div>
-            """
-            
-            st.markdown(task_card, unsafe_allow_html=True)
-            
-            # 완료 체크박스
-            if st.checkbox("완료됨" if is_completed else "완료하기", value=is_completed, key=f"task_check_{task_id}"):
-                if not is_completed:  # 처음 체크했을 때만 축하 애니메이션
-                    st.success('태스크를 완료했습니다! 환상합니다! 🎉')
-                    toggle_task_completion(task_id)
+            if submit_button and concern.strip():
+                st.session_state['current_concern'] = concern
+                with st.spinner("맞춤형 7일 계획을 생성하고 있습니다..."):
+                    # AI를 통해 7일 계획 생성
+                    weekly_plan = generate_weekly_plan(st.session_state['user_info'], concern)
+                    st.session_state['weekly_plan'] = weekly_plan
+                    
+                    # 태스크도 추가
+                    current_date = datetime.datetime.now().date()
+                    for i, plan in enumerate(weekly_plan):
+                        task_date = current_date + datetime.timedelta(days=i)
+                        task_id = f"{task_date.strftime('%Y-%m-%d')}_plan_{i}"
+                        
+                        # 태스크 추가
+                        add_task_to_date(task_date.strftime('%Y-%m-%d'), {
+                            'id': task_id,
+                            'title': plan['title'],
+                            'description': plan['description'],
+                            'completed': False,
+                            'created_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        })
+                    
                     st.rerun()
     
-    st.markdown("---")
-    
-    # 로드맵 탭 - 두 가지 뷰
-    roadmap_tabs = st.tabs(["📜 기본 로드맵", "📋 내가 추가한 계획"])
-    
-    with roadmap_tabs[0]:
-        st.markdown("#### 📓 사주 기반 성장 로드맵")
+    # 7일 계획 표시
+    if st.session_state['weekly_plan']:
+        # 고민 표시
+        st.markdown(f"""<div style='background-color: #f0f7ff; padding: 15px; border-radius: 10px; margin-bottom: 20px;'>
+                    <h4 style='margin-top: 0;'>현재 고민 해결하기</h4>
+                    <p><strong>"{st.session_state['current_concern']}"</strong></p>
+                    </div>""", unsafe_allow_html=True)
+
+        # 통계 카드
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"""
+            <div style='background-color: #f5f5f5; padding: 15px; border-radius: 10px; text-align: center;'>
+                <h2 style='margin:0; color: #1e88e5;'>{len([p for p in st.session_state['weekly_plan'] if p.get('completed', False)])}/7</h2>
+                <p style='margin:0;'>완료한 활동</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        if st.session_state.get('roadmap'):
-            st.markdown(st.session_state['roadmap'])
-        else:
-            with st.spinner("로드맵 생성 중..."):
-                roadmap = generate_saju_insight(st.session_state['user_info'])
-                st.session_state['roadmap'] = roadmap
-                st.markdown(roadmap)
+        with col2:
+            today = datetime.datetime.now().date()
+            start_date = today
+            end_date = today + datetime.timedelta(days=6)
+            st.markdown(f"""
+            <div style='background-color: #f5f5f5; padding: 15px; border-radius: 10px; text-align: center;'>
+                <h3 style='margin:0; color: #43a047;'>{start_date.strftime('%m.%d')} - {end_date.strftime('%m.%d')}</h3>
+                <p style='margin:0;'>실천 기간</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        if st.button("로드맵 다시 생성하기", key="regenerate_roadmap"):
-            with st.spinner("로드맵 재생성 중..."):
-                roadmap = generate_saju_insight(st.session_state['user_info'])
-                st.session_state['roadmap'] = roadmap
-                st.rerun()
-    
-    with roadmap_tabs[1]:
-        st.markdown("#### 📅 내가 추가한 계획")
+        with col3:
+            # 오늘이 7일 중 몇일째인지 계산
+            days_passed = min(7, (datetime.datetime.now().date() - datetime.datetime.now().date()).days + 1)
+            progress = int((days_passed / 7) * 100)
+            st.markdown(f"""
+            <div style='background-color: #f5f5f5; padding: 15px; border-radius: 10px; text-align: center;'>
+                <h2 style='margin:0; color: #e53935;'>{progress}%</h2>
+                <p style='margin:0;'>진행률</p>
+            </div>
+            """, unsafe_allow_html=True)
         
-        if not st.session_state.get('roadmap_items', []):
-            # 빈 상태 안내
-            st.markdown("""
-            <div class='empty-state'>
-                <div class='empty-state-icon'>📝</div>
-                <h3>추가한 계획이 없습니다</h3>
-                <p>고민 상담실에서 '이 계획을 로드맵에 추가' 버튼을 클릭하여 추가해보세요.</p>
+        # 7일 계획 표시
+        st.markdown("### 일주일 실천 계획")
+        
+        # 다시 생성 버튼
+        if st.button("다른 계획 생성하기"):
+            st.session_state['weekly_plan'] = []
+            st.session_state['current_concern'] = ""
+            st.rerun()
+        
+        # 각 날짜별 활동 표시
+        today = datetime.datetime.now().date()
+        for i, plan in enumerate(st.session_state['weekly_plan']):
+            plan_date = today + datetime.timedelta(days=i)
+            date_str = plan_date.strftime("%Y-%m-%d")
+            is_today = plan_date == today
+            is_future = plan_date > today
+            
+            # 날짜에 해당하는 태스크 가져오기
+            date_tasks = get_date_tasks(date_str)
+            task_id = f"{date_str}_plan_{i}" if date_tasks else None
+            task = None
+            
+            # 해당 ID의 태스크 찾기
+            if task_id and date_tasks:
+                for t in date_tasks:
+                    if t.get('id') == task_id:
+                        task = t
+                        break
+            
+            # 완료 상태 가져오기
+            is_completed = task and task.get('completed', False)
+            
+            # 스타일 설정
+            bg_color = "#e8f5e9" if is_completed else "#fff8e1" if is_today else "#f5f5f5" if is_future else "#ffffff"
+            border_color = "#2e7d32" if is_completed else "#fb8c00" if is_today else "#bdbdbd"
+            
+            # 카드 UI
+            st.markdown(f"""
+            <div style='background-color: {bg_color}; border-left: 5px solid {border_color}; padding: 15px; border-radius: 5px; margin-bottom: 10px;'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div>
+                        <h4 style='margin: 0; color: #333;'>Day {i+1}: {plan_date.strftime('%m월 %d일')} ({['월','화','수','목','금','토','일'][plan_date.weekday()]})</h4>
+                        <h3 style='margin: 5px 0; color: {'#2e7d32' if is_completed else '#333'};'>{plan['title']}</h3>
+                        <p style='margin: 0;'>{plan['description']}</p>
+                    </div>
+                    <div>
+                        {'✅' if is_completed else '⏳' if is_today else '▶️' if is_future else '⏹️'}
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # 상담실로 이동 버튼
-            if st.button("고민 상담실로 이동하기"):
-                st.session_state['active_tab'] = 0  # 현재는 구현되지 않았지만, 탭 전환을 위한 예시
-                st.rerun()
-        else:
-            # 카드 형태로 표시
-            for idx, item in enumerate(st.session_state['roadmap_items']):
-                # 임의의 진행률 계산 (실제 앱에서는 더 복잡한 로직으로 바꿔야 함)
-                progress = (idx * 17) % 100 + 10
-                if progress > 100:
-                    progress = 100
-                
-                # 날짜 계산
-                date_added = item.get('date_added', '2025-05-31')
-                days_passed = (datetime.datetime.now() - datetime.datetime.strptime(date_added, "%Y-%m-%d")).days
-                
-                # 카드 UI
-                st.markdown(f"""
-                <div class='roadmap-card'>
-                    <div class='roadmap-title'>🎯 {item['question'][:30]}{'...' if len(item['question']) > 30 else ''}</div>
-                    <div class='roadmap-progress'>
-                        <div class='roadmap-progress-bar' style='width: {progress}%;'></div>
-                    </div>
-                    <div class='roadmap-meta'>
-                        <span>진행률 {progress}%</span>
-                        <span>📅 Day {days_passed}/21</span>
-                    </div>
-                    <div class='roadmap-task'>
-                        <input type='checkbox' class='roadmap-checkbox' id='roadmap_task_{idx}'>
-                        <label for='roadmap_task_{idx}'>오늘의 태스크: {item['question'][:20]}{'...' if len(item['question']) > 20 else ''}</label>
+            # 오늘 할일이면 완료 버튼 표시
+            if is_today and not is_completed and task_id:
+                if st.button(f"활동 완료 표시", key=f"complete_task_{task_id}"):
+                    toggle_task_completion(task_id)
+                    plan['completed'] = True
+                    st.success('오늘의 활동을 완료했습니다! 환상합니다! 🎉')
+                    st.rerun()
+                    
+    st.markdown("---")
+    
+    st.markdown("### 📜 사주 기반 성장 인사이트")
+    
+    if st.session_state.get('roadmap'):
+        st.markdown(st.session_state['roadmap'])
+    else:
+        with st.spinner("인사이트 생성 중..."):
+            roadmap = generate_saju_insight(st.session_state['user_info'])
+            st.session_state['roadmap'] = roadmap
+            st.markdown(roadmap)
+    
+    if st.button("새로운 인사이트 생성하기", key="regenerate_insight"):
+        with st.spinner("인사이트 재생성 중..."):
+            roadmap = generate_saju_insight(st.session_state['user_info'])
+            st.session_state['roadmap'] = roadmap
+            st.rerun()
+    
+    # 고민 기록 관리
+    st.markdown("---")
+    st.markdown("### 📋 나의 고민 기록")
+    
+    # 이전 고민 기록 저장
+    if 'previous_concerns' not in st.session_state:
+        st.session_state['previous_concerns'] = []
+    
+    # 새 고민이 추가되면 기록에 추가
+    if st.session_state['weekly_plan'] and st.session_state['current_concern']:
+        # 현재 고민이 이미 저장되어 있는지 확인
+        existing_concern = next((c for c in st.session_state['previous_concerns'] 
+                               if c['concern'] == st.session_state['current_concern']), None)
+        
+        # 새 고민이면 추가
+        if not existing_concern and len(st.session_state['current_concern']) > 0:
+            st.session_state['previous_concerns'].append({
+                'concern': st.session_state['current_concern'],
+                'created_at': datetime.datetime.now().strftime('%Y-%m-%d')
+            })
+    
+    if not st.session_state.get('previous_concerns', []):
+        # 이전 고민이 없을 때 표시할 내용
+        st.markdown("""
+        <div style='background-color: #f5f5f5; padding: 20px; border-radius: 10px; text-align: center;'>
+            <div style='font-size: 30px; margin-bottom: 10px;'>📝</div>
+            <h3>이전 고민 기록이 없습니다</h3>
+            <p>새로운 고민을 추가하여 7일 계획을 세워보세요.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        # 이전 고민 목록 표시
+        for idx, concern in enumerate(st.session_state.get('previous_concerns', [])):
+            created_date = concern.get('created_at', datetime.datetime.now().strftime('%Y-%m-%d'))
+            days_ago = (datetime.datetime.now().date() - datetime.datetime.strptime(created_date, "%Y-%m-%d").date()).days
+            
+            st.markdown(f"""
+            <div style='background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 10px;'>
+                <div style='display: flex; justify-content: space-between;'>
+                    <div>
+                        <h4 style='margin: 0;'>고민: {concern['concern'][:40]}{'...' if len(concern['concern']) > 40 else ''}</h4>
+                        <p style='margin: 5px 0; color: #666;'>생성일: {created_date} ({days_ago}일 전)</p>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-                
-                # 삭제 버튼
-                if st.button("삭제", key=f"delete_roadmap_{idx}"):
-                    st.session_state['roadmap_items'].remove(item)
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 다시 보기 버튼
+            if st.button("다시 실천하기", key=f"view_concern_{idx}"):
+                st.session_state['current_concern'] = concern['concern']
+                # 주간 계획 다시 생성
+                with st.spinner("주간 계획 생성 중..."):
+                    weekly_plan = generate_weekly_plan(st.session_state['user_info'], concern['concern'])
+                    st.session_state['weekly_plan'] = weekly_plan
                     st.rerun()
             
-            # 모두 삭제 버튼
-            if st.button("모든 계획 삭제", key="clear_roadmap_items"):
-                st.session_state['roadmap_items'] = []
+            # 삭제 버튼
+            if st.button("삭제", key=f"delete_concern_{idx}"):
+                st.session_state['previous_concerns'].pop(idx)
                 st.rerun()
+        
+        # 모두 삭제 버튼
+        if st.button("모든 고민 기록 삭제", key="clear_all_concerns"):
+            st.session_state['previous_concerns'] = []
+            st.rerun()

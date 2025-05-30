@@ -47,13 +47,32 @@ def initialize_session_state() -> None:
     
     # 캘린더 관련 상태
     if 'current_date' not in st.session_state:
-        st.session_state['current_date'] = datetime.datetime.now()
+        st.session_state['current_date'] = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 선택된 날짜 초기화
+    if 'selected_date' not in st.session_state:
+        today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        st.session_state['selected_date'] = today.strftime("%Y-%m-%d")
         
     if 'tasks' not in st.session_state:
-        st.session_state['tasks'] = {}
+        # 샘플 태스크 추가 (테스트용)
+        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        st.session_state['tasks'] = {
+            today_str: [
+                {
+                    'id': f"{today_str}_0",
+                    'title': "오늘의 성장 목표",
+                    'description': "사주에 맞는 성장 계획 세우기"
+                }
+            ]
+        }
         
     if 'task_completion' not in st.session_state:
-        st.session_state['task_completion'] = {}
+        # 태스크 ID를 키로 하는 완료 상태 디셔너리
+        today_str = datetime.datetime.now().strftime("%Y-%m-%d")
+        st.session_state['task_completion'] = {
+            f"{today_str}_0": False
+        }
         
     if 'streak_days' not in st.session_state:
         st.session_state['streak_days'] = 0
