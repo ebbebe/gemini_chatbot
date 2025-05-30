@@ -85,21 +85,7 @@ def show_chat_tab():
                                 })
                             
                             msg['add_to_roadmap'] = True
-                            st.success("✓ 7일 계획으로 생성되었습니다! 로드맵 탭에서 확인해보세요.")
-                            
-                            # 로드맵 탭으로 자동 이동 옵션 제공
-                            if st.button("로드맵 탭으로 이동", key=f"goto_roadmap_{msg_idx}"):
-                                # 탭 인덱스 설정
-                                st.session_state['active_tab'] = 1
-                                
-                                # JavaScript를 사용한 탭 전환
-                                js = """
-                                <script>
-                                    window.parent.document.querySelectorAll('.stTabs button[role="tab"]')[1].click();
-                                </script>
-                                """
-                                st.components.v1.html(js, height=0, width=0)
-                                st.rerun()
+                            st.success("✓ 7일 계획이 생성되었습니다! '나의 7일 계획' 탭에서 확인해보세요.")
     
     # 빠른 질문 칩 버튼들
     st.markdown('<div class="quick-chips">', unsafe_allow_html=True)

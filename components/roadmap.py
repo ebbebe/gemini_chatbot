@@ -28,44 +28,29 @@ def show_roadmap_tab():
     if 'current_concern' not in st.session_state:
         st.session_state['current_concern'] = ""
         
-    # 현재 주간 계획이 없으면 입력 폼 표시
+    # 현재 주간 계획이 없으면 상담실로 이동하라는 안내 표시
     if not st.session_state['weekly_plan']:
-        st.markdown("#### 😌 지금 가장 해결하고 싶은 고민이 무엇인가요?")
-    
-    # 고민 입력 폼 추가
-    if not st.session_state['weekly_plan']:
-        with st.form(key="concern_form"):
-            concern = st.text_area("고민을 입력해주세요", 
-                                 value=st.session_state['current_concern'],
-                                 height=100,
-                                 placeholder="예: 직장에서 엄청한 스트레스를 받고 있어요. 어떻게 해결해야 할까요?")
+        st.markdown("""
+        <div style='background-color: #f5f5f5; padding: 20px; border-radius: 10px; text-align: center;'>
+            <div style='font-size: 30px; margin-bottom: 10px;'>🔮</div>
+            <h3>아직 생성된 7일 계획이 없습니다</h3>
+            <p>고민 상담실에서 AI와 대화한 후 '이 고민을 7일 계획으로 생성' 버튼을 클릭하면<br>고민을 해결하기 위한 7일간의 실천 계획을 생성해드립니다.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 상담실로 이동 버튼
+        if st.button("고민 상담실로 이동하기"):
+            # 탭 인덱스 설정
+            st.session_state['active_tab'] = 0
             
-            st.markdown("※ 고민을 입력하면 사주를 기반으로 7일간의 실천 계획을 제안해드립니다.")
-            submit_button = st.form_submit_button("계획 생성하기")
-            
-            if submit_button and concern.strip():
-                st.session_state['current_concern'] = concern
-                with st.spinner("맞춤형 7일 계획을 생성하고 있습니다..."):
-                    # AI를 통해 7일 계획 생성
-                    weekly_plan = generate_weekly_plan(st.session_state['user_info'], concern)
-                    st.session_state['weekly_plan'] = weekly_plan
-                    
-                    # 태스크도 추가
-                    current_date = datetime.datetime.now().date()
-                    for i, plan in enumerate(weekly_plan):
-                        task_date = current_date + datetime.timedelta(days=i)
-                        task_id = f"{task_date.strftime('%Y-%m-%d')}_plan_{i}"
-                        
-                        # 태스크 추가
-                        add_task_to_date(task_date.strftime('%Y-%m-%d'), {
-                            'id': task_id,
-                            'title': plan['title'],
-                            'description': plan['description'],
-                            'completed': False,
-                            'created_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        })
-                    
-                    st.rerun()
+            # JavaScript를 사용한 탭 전환
+            js = """
+            <script>
+                window.parent.document.querySelectorAll('.stTabs button[role="tab"]')[0].click();
+            </script>
+            """
+            st.components.v1.html(js, height=0, width=0)
+            st.rerun()
     
     # 7일 계획 표시
     if st.session_state['weekly_plan']:
@@ -183,70 +168,4 @@ def show_roadmap_tab():
         with st.spinner("인사이트 재생성 중..."):
             roadmap = generate_saju_insight(st.session_state['user_info'])
             st.session_state['roadmap'] = roadmap
-            st.rerun()
-    
-    # 고민 기록 관리
-    st.markdown("---")
-    st.markdown("### 📋 나의 고민 기록")
-    
-    # 이전 고민 기록 저장
-    if 'previous_concerns' not in st.session_state:
-        st.session_state['previous_concerns'] = []
-    
-    # 새 고민이 추가되면 기록에 추가
-    if st.session_state['weekly_plan'] and st.session_state['current_concern']:
-        # 현재 고민이 이미 저장되어 있는지 확인
-        existing_concern = next((c for c in st.session_state['previous_concerns'] 
-                               if c['concern'] == st.session_state['current_concern']), None)
-        
-        # 새 고민이면 추가
-        if not existing_concern and len(st.session_state['current_concern']) > 0:
-            st.session_state['previous_concerns'].append({
-                'concern': st.session_state['current_concern'],
-                'created_at': datetime.datetime.now().strftime('%Y-%m-%d')
-            })
-    
-    if not st.session_state.get('previous_concerns', []):
-        # 이전 고민이 없을 때 표시할 내용
-        st.markdown("""
-        <div style='background-color: #f5f5f5; padding: 20px; border-radius: 10px; text-align: center;'>
-            <div style='font-size: 30px; margin-bottom: 10px;'>📝</div>
-            <h3>이전 고민 기록이 없습니다</h3>
-            <p>새로운 고민을 추가하여 7일 계획을 세워보세요.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        # 이전 고민 목록 표시
-        for idx, concern in enumerate(st.session_state.get('previous_concerns', [])):
-            created_date = concern.get('created_at', datetime.datetime.now().strftime('%Y-%m-%d'))
-            days_ago = (datetime.datetime.now().date() - datetime.datetime.strptime(created_date, "%Y-%m-%d").date()).days
-            
-            st.markdown(f"""
-            <div style='background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 10px;'>
-                <div style='display: flex; justify-content: space-between;'>
-                    <div>
-                        <h4 style='margin: 0;'>고민: {concern['concern'][:40]}{'...' if len(concern['concern']) > 40 else ''}</h4>
-                        <p style='margin: 5px 0; color: #666;'>생성일: {created_date} ({days_ago}일 전)</p>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # 다시 보기 버튼
-            if st.button("다시 실천하기", key=f"view_concern_{idx}"):
-                st.session_state['current_concern'] = concern['concern']
-                # 주간 계획 다시 생성
-                with st.spinner("주간 계획 생성 중..."):
-                    weekly_plan = generate_weekly_plan(st.session_state['user_info'], concern['concern'])
-                    st.session_state['weekly_plan'] = weekly_plan
-                    st.rerun()
-            
-            # 삭제 버튼
-            if st.button("삭제", key=f"delete_concern_{idx}"):
-                st.session_state['previous_concerns'].pop(idx)
-                st.rerun()
-        
-        # 모두 삭제 버튼
-        if st.button("모든 고민 기록 삭제", key="clear_all_concerns"):
-            st.session_state['previous_concerns'] = []
             st.rerun()
