@@ -59,6 +59,21 @@ def show_roadmap_tab():
                     <h4 style='margin-top: 0;'>현재 고민 해결하기</h4>
                     <p><strong>"{st.session_state['current_concern']}"</strong></p>
                     </div>""", unsafe_allow_html=True)
+        
+        # 추가 설명 표시 (있는 경우에만)
+        if st.session_state.get('plan_additional_explanation'):
+            st.markdown(f"""<div style='background-color: #fffde7; padding: 15px; border-radius: 10px; margin-bottom: 20px;'>
+                        <h4 style='margin-top: 0;'>계획 가이드</h4>
+                        <p>{st.session_state['plan_additional_explanation']}</p>
+                        </div>""", unsafe_allow_html=True)
+        
+        # 디버깅 옵션
+        with st.expander("디버깅 정보 (AI 응답 & 파싱 결과)"):
+            st.subheader("1. AI 원본 응답:")
+            st.code(st.session_state.get('debug_raw_response', '응답이 없습니다.'))
+            
+            st.subheader("2. 파싱된 계획 (데이터 형태):")
+            st.json(st.session_state['weekly_plan'])
 
         # 통계 카드
         col1, col2, col3 = st.columns(3)

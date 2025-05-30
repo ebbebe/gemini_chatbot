@@ -210,7 +210,8 @@ def generate_weekly_plan(user_info: Dict[str, Any], concern: str) -> List[Dict[s
     위 정보를 바탕으로 사용자의 고민을 해결하기 위한 7일간의 실천 계획을 만들어주세요.
     사주를 고려하여 사용자의 특성과 성향에 맞는 단계적 접근법을 제시해주세요.
     
-    반드시 다음 형식으로 응답해주세요:
+    응답형식:
+    1) 첫째로, 7일 계획을 정확히 다음 형식으로 제시하세요:
     Day 1: [제목] - [설명] (30자 내외)
     Day 2: [제목] - [설명] (30자 내외)
     Day 3: [제목] - [설명] (30자 내외)
@@ -219,21 +220,37 @@ def generate_weekly_plan(user_info: Dict[str, Any], concern: str) -> List[Dict[s
     Day 6: [제목] - [설명] (30자 내외)
     Day 7: [제목] - [설명] (30자 내외)
     
-    각 날짜별 계획은 구체적이고 실천 가능해야 합니다. 하루에 한 가지 작은 실천에 집중하도록 해주세요.
-    전체 계획은 점진적으로 발전하여 7일 후에는 고민을 해결하거나 상당한 진전을 이룰 수 있도록 구성해주세요.
+    2) 둘째로, 아래에 다음 형식으로 추가 설명을 제시하세요:
+    
+    ADDITIONAL_EXPLANATION: 이 계획이 사주 특성과 어떻게 연관되는지 설명해주세요. (100자 내외)
+    
+    각 날짜별 계획은 구체적이고 실천 가능해야 합니다. 다른 형식은 추가하지 마세요.
     """
     
     try:
         response = gemini_model.generate_content(prompt)
         plan_text = response.text
         
-        # Day 1: [제목] - [설명] 형식의 텍스트를 파싱
+        # 디버깅용: 세션 상태에 원본 응답 저장
+        st.session_state['debug_raw_response'] = plan_text
+        
+        # 추가 설명 추출
+        additional_explanation = ""
+        explanation_match = re.search(r'ADDITIONAL_EXPLANATION:\s*(.*?)(?:\n|$)', plan_text, re.DOTALL)
+        if explanation_match:
+            additional_explanation = explanation_match.group(1).strip()
+        st.session_state['plan_additional_explanation'] = additional_explanation
+        
+        # Day 1-7 형식의 라인만 추출
+        day_lines = []
+        for line in plan_text.strip().split('\n'):
+            if re.match(r'Day \d+:', line.strip()):
+                day_lines.append(line.strip())
+        
+        # 추출된 라인을 파싱
         plans = []
-        lines = plan_text.strip().split('\n')
-        for i in range(min(7, len(lines))):
-            line = lines[i].strip()
-            if not line:  # 공백 줄 건너뛰기
-                continue
+        for i in range(min(7, len(day_lines))):
+            line = day_lines[i]
                 
             try:
                 # 다양한 형식 처리
