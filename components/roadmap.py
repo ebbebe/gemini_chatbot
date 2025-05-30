@@ -148,9 +148,20 @@ def show_roadmap_tab():
             # 오늘 할일이면 완료 버튼 표시
             if is_today and not is_completed and task_id:
                 if st.button(f"활동 완료 표시", key=f"complete_task_{task_id}"):
+                    # 태스크 완료 상태 업데이트
                     toggle_task_completion(task_id)
-                    plan['completed'] = True
+                    
+                    # 세션 상태에서 직접 계획 업데이트
+                    st.session_state['weekly_plan'][i]['completed'] = True
+                    
+                    # 성공 메시지 표시
                     st.success('오늘의 활동을 완료했습니다! 환상합니다! 🎉')
+                    
+                    # UI 새로고침 전에 잠시 대기
+                    import time
+                    time.sleep(0.5)
+                    
+                    # 새로고침
                     st.rerun()
                     
     st.markdown("---")
