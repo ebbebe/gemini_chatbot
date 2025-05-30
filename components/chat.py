@@ -51,7 +51,7 @@ def show_chat_tab():
                 if role == 'assistant' and idx == last_ai_msg_idx and idx > 0:
                     # 이전 메시지가 사용자 메시지인지 확인
                     if st.session_state['chat_messages'][idx-1]['role'] == 'user':
-                        if st.button("📅 고민을 요약해서 7일 계획으로 생성", key=f"add_roadmap_{idx}"):
+                        if st.button("📅 대화를 요약해서 7일 계획으로 생성", key=f"add_roadmap_{idx}"):
                             from utils.saju import generate_weekly_plan, summarize_conversation
                             
                             with st.spinner("대화 내용을 분석하고 7일 계획을 생성하고 있습니다..."):
