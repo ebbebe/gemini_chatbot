@@ -22,7 +22,7 @@ def show_chat_tab():
     
     # 초기 인사 메시지 추가 (첫 방문 시에만)
     if not st.session_state['has_initial_greeting'] and st.session_state['user_info'].get('core_traits'):
-        greeting_message = f"안녕하세요 {st.session_state['user_info']['name']}님! 당신을 위한 AI 코치입니다. 어떤 고민이 있으신가요?"
+        greeting_message = f"안녕하세요 {st.session_state['user_info']['name']}님! 좋은 하루 보내셨나요?"
         st.session_state['chat_messages'].append({
             'role': 'assistant',  # st.chat_message에서는 'ai' 대신 'assistant' 사용
             'content': greeting_message
